@@ -1,4 +1,4 @@
-PREDICTION=1
+PREDICTION=0
 PLAYING=0
 CPT=0
 
@@ -6,7 +6,7 @@ function clean_up {
 
 	# Perform program exit housekeeping
 	echo ""
-	echo "Thank you for using parenting 2.0"
+	echo "Thank you for using parenting 2.1"
 	echo "Good Bye."
 	stop_playing
 	exit
@@ -22,7 +22,7 @@ function recording(){
 
 function predict() {
 	echo "Predicting..."
-	echo -n "What is the prediction ?"
+	echo -n "What is the prediction? "
 	python /opt/baby_cry_rpi/script/make_prediction.py
 	PREDICTION=$(cat /opt/baby_cry_rpi/prediction/prediction.txt)
 	echo "Prediction is $PREDICTION"
@@ -43,7 +43,7 @@ function stop_playing(){
 	fi
 }
 
-echo "Welcome to Parenting 2.0"
+echo "Welcome to Parenting 2.1"
 echo ""
 while true; do
 	recording
@@ -54,6 +54,6 @@ while true; do
 		CPT=$(expr $CPT + 1)
 		start_playing
 	fi
-echo "State of the Process PREDICTION = $PREDICTION, PLAYING=$PLAYING, COMPTEUR=$CPT"
+echo "State of the Process PREDICTION = $PREDICTION, PLAYING=$PLAYING, # TIMES MY BABY CRIED=$CPT"
 done
 clean_up
