@@ -124,6 +124,10 @@ ENV/
 
 ## Plugin-specific files:
 
+# pyCharm idea
+.idea
+*.iml
+
 # IntelliJ
 /out/
 
