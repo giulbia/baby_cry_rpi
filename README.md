@@ -1,4 +1,4 @@
-# Baby cry detection, on the Raspberry Pi side
+# Baby cry detection - deployment on Raspberry Pi
 
 Recognition of baby cry from audio signal
 
