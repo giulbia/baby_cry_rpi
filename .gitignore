@@ -101,3 +101,4 @@ ENV/
 
 ### Project stuff
 model/*.pkl
+recording/*.wav
