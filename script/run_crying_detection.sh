@@ -19,6 +19,12 @@ function recording(){
 	arecord -D plughw:1,0 -d 9 -f S16_LE -c1 -r44100 -t wav /opt/baby_cry_rpi/recording/signal_9s.wav
 }
 
+function interacting_with_gcp(){
+    echo "Sending wav to bucket..."
+    gsutil cp /opt/baby_cry_rpi/recording/signal_9s.wav gs://parenting-3-mlengine/recording
+    echo -n "Waiting for answer..."
+}
+
 
 function predict() {
 	echo "Predicting..."
@@ -47,6 +53,7 @@ echo "Welcome to Parenting 2.1"
 echo ""
 while true; do
 	recording
+	interacting_with_gcp
 	predict
 	if [[ $PREDICTION == 0 ]]; then
 		stop_playing
