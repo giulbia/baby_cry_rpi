@@ -21,7 +21,7 @@ function recording(){
 
 function interacting_with_gcp(){
     echo "Sending wav to bucket..."
-    gsutil cp /opt/baby_cry_rpi/recording/signal_9s.wav gs://parenting-3-mlengine/recording
+    gsutil cp /opt/baby_cry_rpi/recording/signal_9s.wav gs://parenting-3-recording/
     echo -n "Waiting for answer..."
 }
 
