@@ -103,3 +103,4 @@ ENV/
 model/*.pkl
 recording/*.wav
 test_record
+script/*.zip
