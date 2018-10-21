@@ -22,6 +22,10 @@ def read_wav_and_feat_eng(data, context):
     print('Created: {}'.format(data['timeCreated']))
     print('Updated: {}'.format(data['updated']))
 
+    print('gs://{}/{}'.format(data['bucket'], data['name']))
+
+    play_list = read_audio_file('gs://{}/{}'.format(data['bucket'], data['name']))
+
 
 def read_audio_file(file_name):
     """
@@ -30,6 +34,8 @@ def read_audio_file(file_name):
     :return:
     * play_list: a list of audio_data as numpy.ndarray. There are 5 overlapping signals, each one is 5-second long.
     """
+
+    print(file_name)
 
     play_list = list()
 
