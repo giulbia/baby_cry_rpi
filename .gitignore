@@ -102,3 +102,4 @@ ENV/
 ### Project stuff
 model/*.pkl
 recording/*.wav
+test_record
