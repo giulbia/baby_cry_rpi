@@ -1,1 +1,4 @@
 librosa==0.4.3
+SoundFile==0.10.2
+google-cloud-storage
+google-api-python-client

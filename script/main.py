@@ -1,5 +1,9 @@
-import librosa
 import numpy as np
+import soundfile as sf
+import io
+import json
+from google.cloud import storage
+import googleapiclient.discovery
 from librosa.feature import zero_crossing_rate, mfcc, spectral_centroid, spectral_rolloff, spectral_bandwidth, rmse
 
 
@@ -24,10 +28,54 @@ def read_wav_and_feat_eng(data, context):
 
     print('gs://{}/{}'.format(data['bucket'], data['name']))
 
-    play_list = read_audio_file('gs://{}/{}'.format(data['bucket'], data['name']))
+    BUCKET = data['bucket']
+
+    # Create a Cloud Storage client.
+    gcs = storage.Client()
+
+    # Get the bucket that the file will be uploaded to.
+    bucket = gcs.get_bucket(BUCKET)
+
+    # READ AUDIO FILE
+
+    # specify a filename
+    file_name = data['name']
+
+    # read a blob
+    blob = bucket.blob(file_name)
+    file_as_string = blob.download_as_string()
+
+    play_list = read_audio_file(file_as_string)
+
+    print("\nREADING DONE\n")
+
+    print(len(play_list))
+    print([play_list[i].size for i in range(len(play_list))])
+
+    # FEATURE ENGINEERING
+    play_list_processed = list()
+
+    for signal in play_list:
+        play_list_processed.append(feature_engineer(signal))
+
+    print("\nFEATURE ENGINEERING DONE\n")
+
+    # CREATE JSON WITH FEATURES
+    play_list_json = features_to_json(play_list_processed)
+
+    print("\nDATA READY FOR PREDICTION: JSON FORMAT DONE\n")
+
+    # GET PREDICTIONS WITH ML ENGINE
+    predictions = predict_json(project="parenting-3", model="model", instances=json.loads(play_list_json)["instances"],
+                               version="v11")
+
+    print("\nPREDICTION DONE\n")
+    print(predictions)
+
+    # MAJORITY VOTE
 
 
-def read_audio_file(file_name):
+def read_audio_file(file_as_string):
     """
     Read audio file using librosa package. librosa allows resampling to desired sample rate and convertion to mono.
 
@@ -35,12 +83,14 @@ def read_audio_file(file_name):
     * play_list: a list of audio_data as numpy.ndarray. There are 5 overlapping signals, each one is 5-second long.
     """
 
-    print(file_name)
+    # convert the string to bytes and then finally to audio samples as floats
 
     play_list = list()
+    sr = 44100
+    n_samples = sr * 5
 
     for offset in range(5):
-        audio_data, _ = librosa.load(file_name, sr=44100, mono=True, offset=offset, duration=5.0)
+        audio_data, _ = sf.read(file=io.BytesIO(file_as_string), start=offset*sr, stop=n_samples+offset*sr)
         play_list.append(audio_data)
 
     return play_list
@@ -72,7 +122,7 @@ def feature_engineer(audio_data):
                                   spectral_bandwidth_feat
                                   ), axis=0)
 
-    return np.mean(concat_feat, axis=1, keepdims=True).transpose()
+    return np.mean(concat_feat, axis=1, keepdims=True).transpose()[0].tolist()
 
 
 def compute_librosa_features(audio_data, feat_name):
@@ -98,3 +148,48 @@ def compute_librosa_features(audio_data, feat_name):
         return spectral_rolloff(y=audio_data, sr=rate, hop_length=frame, roll_percent=0.90)
     elif feat_name == 'spectral_bandwidth':
         return spectral_bandwidth(y=audio_data, sr=rate, hop_length=frame)
+
+
+def features_to_json(processed_data):
+
+    #Create dictionary
+    dic = dict()
+    dic['instances'] = processed_data
+
+    #Dump data dict to jason
+    return json.dumps(dic)
+
+
+def predict_json(project, model, instances, version=None):
+    """
+    Send json data to a deployed model for prediction.
+    Args:
+        project (str): project where the Cloud ML Engine Model is deployed.
+        model (str): model name.
+        instances ([[float]]): List of input instances, where each input
+           instance is a list of floats.
+        version: str, version of the model to target.
+    Returns:
+        Mapping[str: any]: dictionary of prediction results defined by the
+            model.
+    """
+
+    # Create the ML Engine service object.
+    # To authenticate set the environment variable
+    # GOOGLE_APPLICATION_CREDENTIALS=<path_to_service_account_file>
+
+    service = googleapiclient.discovery.build('ml', 'v1')
+    name = 'projects/{}/models/{}'.format(project, model)
+
+    if version is not None:
+        name += '/versions/{}'.format(version)
+
+    response = service.projects().predict(
+        name=name,
+        body={'instances': instances}
+    ).execute()
+
+    if 'error' in response:
+        raise RuntimeError(response['error'])
+
+    return response['predictions']

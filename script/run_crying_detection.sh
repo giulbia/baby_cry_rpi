@@ -1,6 +1,10 @@
+#!/usr/bin/env bash
+
 PREDICTION=0
 PLAYING=0
 CPT=0
+
+PROJECT_PATH=/opt/baby_cry_rpi
 
 function clean_up {
 
@@ -15,35 +19,34 @@ function clean_up {
 trap clean_up SIGHUP SIGINT SIGTERM
 
 function recording(){
-	echo "Start Recording..."
-	arecord -D plughw:1,0 -d 9 -f S16_LE -c1 -r44100 -t wav /opt/baby_cry_rpi/recording/signal_9s.wav
+	echo -n "Start Recording..."
+	arecord -D plughw:1,0 -d 9 -f S16_LE -c1 -r44100 -t wav ${PROJECT_PATH}/recording/signal_9s.wav
 }
 
 function interacting_with_gcp(){
-    echo "Sending wav to bucket..."
-    gsutil cp /opt/baby_cry_rpi/recording/signal_9s.wav gs://parenting-3-recording/
+    echo -n "Sending wav to bucket..."
+    gsutil cp ${PROJECT_PATH}/recording/signal_9s.wav gs://parenting-3-recording/
     echo -n "Waiting for answer..."
 }
 
-
 function predict() {
-	echo "Predicting..."
+	echo -n "Predicting..."
 	echo -n "What is the prediction? "
-	python /opt/baby_cry_rpi/script/make_prediction.py
-	PREDICTION=$(cat /opt/baby_cry_rpi/prediction/prediction.txt)
+	python ${PROJECT_PATH}/script/make_prediction.py
+	PREDICTION=$(cat ${PROJECT_PATH}/prediction/prediction.txt)
 	echo "Prediction is $PREDICTION"
 }
 
 function start_playing() {
-	if [[ $PLAYING == 0 ]]; then
+	if [[ ${PLAYING} == 0 ]]; then
 		echo "start playing"
-                aplay -D plughw:0,0 /opt/baby_cry_rpi/lullaby/lullaby_classic.wav
+                aplay -D plughw:0,0 ${PROJECT_PATH}/lullaby/lullaby_classic.wav
 		PLAYING=1
 	fi
 }
 
 function stop_playing(){
-	if [[ $PLAYING == 1 ]]; then
+	if [[ ${PLAYING} == 1 ]]; then
 		echo "stop playing"
 		PLAYING=0
 	fi
@@ -55,10 +58,10 @@ while true; do
 	recording
 	interacting_with_gcp
 	predict
-	if [[ $PREDICTION == 0 ]]; then
+	if [[ ${PREDICTION} == 0 ]]; then
 		stop_playing
 	else
-		CPT=$(expr $CPT + 1)
+		CPT=$(expr ${CPT} + 1)
 		start_playing
 	fi
 echo "State of the Process PREDICTION = $PREDICTION, PLAYING=$PLAYING, # TIMES MY BABY CRIED=$CPT"

@@ -104,3 +104,4 @@ model/*.pkl
 recording/*.wav
 test_record
 script/*.zip
+script/test.py
