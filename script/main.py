@@ -2,6 +2,7 @@ import numpy as np
 import soundfile as sf
 import io
 import json
+import re
 from google.cloud import storage
 import googleapiclient.discovery
 from librosa.feature import zero_crossing_rate, mfcc, spectral_centroid, spectral_rolloff, spectral_bandwidth, rmse
@@ -73,6 +74,15 @@ def read_wav_and_feat_eng(data, context):
     print(predictions)
 
     # MAJORITY VOTE
+    num_predictions = list()
+    for predicted_class in predictions:
+        num_predictions.append(is_baby_cry(predicted_class))
+
+    final_prediction = majority_vote(num_predictions)
+
+    print("\nFinal prediction is: {}.\n".format(final_prediction))
+
+    # SEND BACK RASPBERRY PI
 
 
 def read_audio_file(file_as_string):
@@ -151,6 +161,11 @@ def compute_librosa_features(audio_data, feat_name):
 
 
 def features_to_json(processed_data):
+    """
+    Put features into json format
+    :param processed_data: list of list of features [[feat_1, feat_2, feat_3, ...], [feat_1, feat_2, feat_3, ...]]
+    :return: json {"instances": [[feat_1, feat_2, feat_3, ...], [feat_1, feat_2, feat_3, ...]]}
+    """
 
     #Create dictionary
     dic = dict()
@@ -193,3 +208,35 @@ def predict_json(project, model, instances, version=None):
         raise RuntimeError(response['error'])
 
     return response['predictions']
+
+
+def is_baby_cry(predicted_class):
+    """
+    Make prediction with trained model
+
+    :param predicted_class: str of the kind '004 - Baby cry'
+    :return: 1 (it's baby cry); 0 (it's not a baby cry)
+    """
+
+    match = re.search('Crying baby', predicted_class)
+
+    if match:
+        return 1
+    else:
+        return 0
+
+
+def majority_vote(prediction_list):
+    """
+    Overall prediction
+
+    :param prediction_list: numeric list of 0's and 1's
+
+    :return: 1 if more than half predictions are 1s
+    """
+
+    if sum(prediction_list) > len(prediction_list)/2.0:
+        return 1
+    else:
+        return 0
+
