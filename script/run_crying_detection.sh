@@ -18,6 +18,18 @@ function clean_up {
 
 trap clean_up SIGHUP SIGINT SIGTERM
 
+function set_up_mqtt_credentials(){
+
+    python ../../python-docs-samples/iot/api-client/mqtt_example/cloudiot_mqtt_example.py \
+        --registry_id=raspberry-pi \
+        --cloud_region=europe-west1 \
+        --project_id=parenting-3 \
+        --device_id=rpi \
+        --ca_certs=../credentials/roots.pem
+        --algorithm=RS256 \
+        --private_key_file=../credentials/rsa_private.pem
+}
+
 function recording(){
 	echo -n "Start Recording..."
 	arecord -D plughw:1,0 -d 9 -f S16_LE -c1 -r44100 -t wav ${PROJECT_PATH}/recording/signal_9s.wav
@@ -55,6 +67,7 @@ function stop_playing(){
 echo "Welcome to Parenting 2.1"
 echo ""
 while true; do
+    set_up_mqtt_credentials
 	recording
 	interacting_with_gcp
 	predict

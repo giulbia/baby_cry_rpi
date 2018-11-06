@@ -1,11 +1,16 @@
 import numpy as np
-import soundfile as sf
 import io
 import json
 import re
+import base64
+
+import soundfile as sf
+from librosa.feature import zero_crossing_rate, mfcc, spectral_centroid, spectral_rolloff, spectral_bandwidth, rmse
+
 from google.cloud import storage
 import googleapiclient.discovery
-from librosa.feature import zero_crossing_rate, mfcc, spectral_centroid, spectral_rolloff, spectral_bandwidth, rmse
+from google.oauth2 import service_account
+from googleapiclient.errors import HttpError
 
 
 def read_wav_and_feat_eng(data, context):
@@ -34,10 +39,10 @@ def read_wav_and_feat_eng(data, context):
     # Create a Cloud Storage client.
     gcs = storage.Client()
 
-    # Get the bucket that the file will be uploaded to.
-    bucket = gcs.get_bucket(BUCKET)
-
     # READ AUDIO FILE
+
+    # Get the bucket where the wav file will be uploaded to.
+    bucket = gcs.get_bucket(BUCKET)
 
     # specify a filename
     file_name = data['name']
@@ -82,7 +87,30 @@ def read_wav_and_feat_eng(data, context):
 
     print("\nFinal prediction is: {}.\n".format(final_prediction))
 
-    # SEND BACK RASPBERRY PI
+    # SAVE PREDICTION AS TEXT FILE IN RESERVED BUCKET
+
+    bucket_name = "parenting-3-prediction"
+
+    pred_bucket = gcs.get_bucket(bucket_name)
+
+    blob = pred_bucket.blob("prediction.txt")
+
+    blob.upload_from_string(str(final_prediction))
+
+    # Make the file publicly accessible so that a device can download it
+    blob.make_public()
+
+    print('File {} is publicly accessible at {}'.format(blob.name, blob.public_url))
+
+    print('Sending file location to device...')
+    send_to_device(bucket_name="parenting-3-prediction",
+                   gcs_file_name="prediction.txt",
+                   destination_file_name="prediction.txt",
+                   project_id="parenting-3",
+                   registry_id="raspberry-pi",
+                   device_id="rpi",
+                   service_account_json=None,
+                   cloud_region="europe-west1")
 
 
 def read_audio_file(file_as_string):
@@ -240,3 +268,73 @@ def majority_vote(prediction_list):
     else:
         return 0
 
+
+def get_client(service_account_json):
+    """Returns an authorized API client by discovering the IoT API and creating
+    a service object using the service account credentials JSON."""
+    api_scopes = ['https://www.googleapis.com/auth/cloud-platform']
+    api_version = 'v1'
+    discovery_api = 'https://cloudiot.googleapis.com/$discovery/rest'
+    service_name = 'cloudiotcore'
+
+    credentials = service_account.Credentials.from_service_account_file(service_account_json)
+    scoped_credentials = credentials.with_scopes(api_scopes)
+
+    discovery_url = '{}?version={}'.format(
+        discovery_api, api_version)
+
+    return googleapiclient.discovery.build(
+        service_name,
+        api_version,
+        discoveryServiceUrl=discovery_url,
+        credentials=scoped_credentials)
+
+
+def send_to_device(
+        bucket_name,
+        gcs_file_name,
+        destination_file_name,
+        project_id,
+        cloud_region,
+        registry_id,
+        device_id,
+        service_account_json):
+    """Sends the configuration to the device."""
+
+    client = get_client(service_account_json)
+
+    device_name = 'projects/{}/locations/{}/registries/{}/devices/{}'.format(
+        project_id, cloud_region, registry_id, device_id)
+
+    config_data = ({
+        'bucket_name': bucket_name,
+        'gcs_file_name': gcs_file_name,
+        'destination_file_name': destination_file_name
+    })
+
+    config_data_json = json.dumps(config_data, separators=(',', ': '))
+
+    body = {
+        # The device configuration specifies a version to update, which
+        # can be used to avoid having configuration updates race. In this
+        # case, you use the special value of 0, which tells Cloud IoT Core to
+        # always update the config.
+        'version_to_update': 0,
+        # The data is passed as raw bytes, so we encode it as base64. Note
+        # that the device will receive the decoded string, and so you do not
+        # need to base64 decode the string on the device.
+        'binary_data': base64.b64encode(config_data_json.encode('utf-8'))
+            .decode('ascii')
+    }
+
+    request = client.projects().locations().registries().devices(
+    ).modifyCloudToDeviceConfig(name=device_name, body=body)
+
+    try:
+        request.execute()
+        print('Successfully sent file to device: {}'.format(device_id))
+    except HttpError as e:
+        # If the server responds with an HtppError, most likely because
+        # the config version sent differs from the version on the
+        # device, log it here.
+        print('Error executing ModifyCloudToDeviceConfig: {}'.format(e))
