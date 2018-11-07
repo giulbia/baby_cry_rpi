@@ -20,14 +20,14 @@ trap clean_up SIGHUP SIGINT SIGTERM
 
 function set_up_mqtt_credentials(){
 
-    python ../../python-docs-samples/iot/api-client/mqtt_example/cloudiot_mqtt_example.py \
+    python ${PROJECT_PATH}/credentials/cloudiot_mqtt_example.py \
         --registry_id=raspberry-pi \
         --cloud_region=europe-west1 \
         --project_id=parenting-3 \
         --device_id=rpi \
-        --ca_certs=../credentials/roots.pem
-        --algorithm=RS256 \
-        --private_key_file=../credentials/rsa_private.pem
+        --ca_certs=../credentials/roots.pem \
+        --private_key_file=${PROJECT_PATH}/credentials/rsa_private.pem \
+	--algorithm=RS256
 }
 
 function recording(){
